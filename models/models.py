@@ -105,18 +105,6 @@ class User(db.Model):
     updated_at = db.Column(db.Date, default=datetime.datetime.utcnow)
     is_company = db.Column(db.Boolean)
 
-    # def __init__(self, id, name, email, password, is_activated, activated_at, last_login, created_at, updated_at, is_company,):
-    #     self.id = id
-    #     self.name = name
-    #     self.email = email
-    #     self.password = password
-    #     self.is_company = is_company
-    #     self.is_activated = is_activated
-    #     self.activated_at = activated_at
-    #     self.last_login = last_login
-    #     self.created_at = created_at
-    #     self.updated_at = updated_at
-
 
 class Company(db.Model):
     __tablename__ = 'avirdigital_jobustan_companies'

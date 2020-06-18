@@ -1,35 +1,36 @@
 from flask import Flask
 from flask import jsonify
-from scraping import scrape, vacancies, ejobScrape, ejobVacancies
+from scraping import scrape, vacancies, ejobScrape, ejobVacancies, jobScrape
 from flask_sqlalchemy import SQLAlchemy
 from models.models import Jobs, Select, Positions, Categories, Subcategories, User, Company, Test
 import random
 from flask import session
 import string
+import sys
 
 app = Flask(__name__)
 app.secret_key = 'secret s key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root@localhost/new_job'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root@localhost/last_jobs'
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://club941_jobustan:5,-*[62oi[,T@192.254.185.1:3306/club941_jobustan'
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'postgres://xarezncgdwtmeo:1cbd10d0a9dff21ee58b9b41f562cdbb887a0bbc5365dab6b687098f30307e0d@ec2-54-75-249-16.eu-west-1.compute.amazonaws.com:5432/d3si22qqc83i3o'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy()
 db.init_app(app)
 
-# APScheduler==3.6.3
 
 def id_generator(size=6, chars=string.ascii_lowercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
 
 @app.route('/', methods=['GET'])
-def index():
+def index(i=0):
     return 'ok'
 
 
 @app.route('/insert', methods=['GET'])
 def insert():
     print('function is started')
+    i=0;
     jobs = vacancies()
     months = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'İyun', 'İyul', 'Avqust', 'Sentyabr', 'Oktyabr',
               'Noyabr', 'Dekabr']
@@ -56,7 +57,7 @@ def insert():
                     subcategory_id = int(ids[2])
                     category_id = int(ids[1])
                 else:
-                    cat_other = Categories.query.filter_by(name='Digər').first()
+                    cat_other = Categories.query.filter_by(name='Müxtəlif').first()
                     if cat_other:
                         category_id = cat_other.id
                     else:
@@ -121,10 +122,19 @@ def insert():
             salary = salary.strip(' AZN')
             salary_list = salary.split('-')
             if len(salary_list)>1:
-                salary = 2
-                minsalary = salary_list[0]
-                maxsalary = salary_list[1]
-                salaryfix = None
+                print(salary)
+                print(salary_list)
+                if salary_list[0] == '':
+                    salary = 3
+                    minsalary = None
+                    salaryfix = None
+                    maxsalary = None
+                else:
+                    salary = 2
+                    minsalary = salary_list[0]
+                    print('minsalary='+minsalary)
+                    maxsalary = salary_list[1]
+                    salaryfix = None
             else:
                 if salary_list[0] == '-':
                     salary = 3
@@ -302,7 +312,8 @@ def insert():
             db.session.commit()
             session.clear()
             db.session.remove()
-            print('ok')
+            i=i+1;
+            print(i)
     print('finish')
     return 'okay', 200
 
@@ -336,6 +347,11 @@ def ejob():
 @app.route('/ejob-vac')
 def ejobVac():
     return jsonify(Jobs=ejobVacancies())
+
+
+@app.route('/job')
+def jobVac():
+    return jsonify(Jobs=jobScrape())
 
 
 if __name__ == "__main__":

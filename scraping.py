@@ -2,6 +2,9 @@ from bs4 import BeautifulSoup
 import requests
 import random
 import time
+from lxml.html import fromstring
+from itertools import cycle
+import traceback
 
 user_agent_list = [
    #Chrome
@@ -30,10 +33,6 @@ user_agent_list = [
     'Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)',
     'Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 5.1; Trident/4.0; .NET CLR 2.0.50727; .NET CLR 3.0.4506.2152; .NET CLR 3.5.30729)'
 ]
-proxies = {
-    "http": 'http://209.50.52.162:9050',
-    "https": 'http://209.50.52.162:9050'
-}
 
 
 def header_rotate():
@@ -43,10 +42,23 @@ def header_rotate():
         return headers
 
 
+def get_proxies():
+    url = 'https://free-proxy-list.net/'
+    response = requests.get(url)
+    parser = fromstring(response.text)
+    proxies = set()
+    for i in parser.xpath('//tbody/tr')[:10]:
+        if i.xpath('.//td[7][contains(text(),"yes")]'):
+            #Grabbing IP and corresponding PORT
+            proxy = ":".join([i.xpath('.//td[1]/text()')[0], i.xpath('.//td[2]/text()')[0]])
+            proxies.add(proxy)
+    return proxies
+
+
 def scrape():
     jobs = []
     i = 0
-    for page in range(0, 5):
+    for page in range(0, 10):
         page = page + 1
         base_url = 'https://boss.az/vacancies?action=index&controller=vacancies&only_path=true&page=' + str(page) + '&type=vacancies'
         source_code = requests.get(base_url, headers=header_rotate())
@@ -117,28 +129,58 @@ def vacancies():
     return vacancies
 
 
+proxies = get_proxies()
+proxy_pool = cycle(proxies)
+
+
+def ejobSource(base_url):
+    try:
+        proxy = next(proxy_pool)
+        source_code = requests.get(base_url, headers=header_rotate(), proxies={"http": proxy, "https": proxy})
+        r = source_code.text
+        soup = BeautifulSoup(r, 'html.parser')
+        all_product = soup.find_all('table', {"style": "width:800px; margin-bottom:2px;"})
+        return all_product
+    except:
+        print('proxy error')
+        ejobSource(base_url)
+
+
 def ejobScrape():
     jobs = []
-    for page in range(0, 5):
-        time.sleep(2)
+    for page in range(0, 2):
+        proxy = next(proxy_pool)
         page = page + 1
         base_url = 'https://ejob.az/is-tap/page-' + str(page) + '/'
+        all_product = ejobSource(base_url)
+        if all_product != None:
+            for item in all_product:
+                d = {}
+                title = item.find('h3', {'class': 'position'})
+                d['title'] = title.text
+                url = title.find_all('a', href=True)
+                d['url'] = 'https://ejob.az' + str(url[0].get('href'))
+                id = d['url'].split('/')[4]
+                id = id.split('-')[0]
+                d['id'] = id
+                jobs.append(d)
+    return jobs
+
+
+def jobScrape():
+    jobs = []
+    for page in range(0, 5):
+        page = page + 1
+        base_url = 'http://jobustan.com/job-search?salary_rang_min=&salary_rang_max=&perPage=' + str(page)
         source_code = requests.get(base_url, headers=header_rotate())
         r = source_code.text
         soup = BeautifulSoup(r, 'html.parser')
-        all_product = soup.find_all('table', {"style" : "width:800px; margin-bottom:2px;"})
-        # all_product = soup.find_all('table', class_='background')
+        all_product = soup.find_all('div', {"class": "jobs-card__text"})
         for item in all_product:
             d = {}
-            title = item.find('h3', {'class': 'position'})
+            title = item.find('div', {'class': 'jobs-card__jobsName'})
             d['title'] = title.text
-            url = title.find_all('a', href=True)
-            d['url'] ='https://ejob.az'+str(url[0].get('href'))
-            id = d['url'].split('/')[4]
-            id = id.split('-')[0]
-            d['id'] = id
             jobs.append(d)
-
     return jobs
 
 
@@ -146,9 +188,10 @@ def ejobVacancies():
     jobs = ejobScrape()
     vacancies = []
     for job in jobs:
+        proxy = next(proxy_pool)
         d = {}
         base_url = job['url']
-        source_code = requests.get(base_url, headers=header_rotate())
+        source_code = requests.get(base_url, headers=header_rotate(), proxies={"http": proxy, "https": proxy})
         r = source_code.text
         soup = BeautifulSoup(r, "html.parser")
         all = soup.find_all('table', {"style":"width:1250px; margin:0 auto;"})
@@ -166,3 +209,4 @@ def cfDecodeEmail(encodedString):
     r = int(encodedString[:2],16)
     email = ''.join([chr(int(encodedString[i:i+2], 16) ^ r) for i in range(2, len(encodedString), 2)])
     return email
+
